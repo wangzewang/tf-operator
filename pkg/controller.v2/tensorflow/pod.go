@@ -34,6 +34,11 @@ const (
 	// tfConfig is the environment variable name of TensorFlow cluster spec.
 	tfConfig = "TF_CONFIG"
 
+	// rpcLayer is the enviroment variable name of pod TF_CONFIG spec.
+	rpcLayer = "RPC_LAYER"
+	// rpcLayer default value.
+	rpcLayerDefault = "grpc"
+
 	// podTemplateRestartPolicyReason is the warning reason when the restart
 	// policy is set in pod template.
 	podTemplateRestartPolicyReason = "SettedPodTemplateRestartPolicy"
@@ -173,8 +178,17 @@ func (tc *TFController) createNewPod(tfjob *tfv1alpha2.TFJob, rt, index string, 
 }
 
 func setClusterSpec(podTemplateSpec *v1.PodTemplateSpec, tfjob *tfv1alpha2.TFJob, rt, index string) error {
+	var rpcLayerVal = rpcLayerDefault
+	for i := range podTemplateSpec.Spec.Containers {
+		for _, j := range podTemplateSpec.Spec.Containers[i].Env {
+			if j.Name == rpcLayer {
+				rpcLayerVal = j.Value
+				break
+			}
+		}
+	}
 	// Generate TF_CONFIG JSON string.
-	tfConfigStr, err := genTFConfigJSONStr(tfjob, rt, index)
+	tfConfigStr, err := genTFConfigJSONStr(tfjob, rt, index, rpcLayerVal)
 	if err != nil {
 		return err
 	}

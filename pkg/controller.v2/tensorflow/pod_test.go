@@ -92,6 +92,7 @@ func TestClusterSpec(t *testing.T) {
 		index               string
 		customClusterDomain string
 		expectedClusterSpec string
+		rpcLayer            string
 	}
 	testCase := []tc{
 		tc{
@@ -99,43 +100,61 @@ func TestClusterSpec(t *testing.T) {
 			rt:                  "worker",
 			index:               "0",
 			customClusterDomain: "",
+			rpcLayer:            "grpc",
 			expectedClusterSpec: `{"cluster":{"worker":["` + testutil.TestTFJobName +
-				`-worker-0.ns0.svc:2222"]},"task":{"type":"worker","index":0},"environment":"cloud"}`,
+				`-worker-0.ns0.svc:2222"]},"task":{"type":"worker","index":0},"rpclayer":"grpc","environment":"cloud"}`,
 		},
 		tc{
 			tfJob:               testutil.NewTFJobWithNamespace(1, 0, "ns1"),
 			rt:                  "worker",
 			index:               "0",
 			customClusterDomain: "tf.training.com",
+			rpcLayer:            "grpc",
 			expectedClusterSpec: `{"cluster":{"worker":["` + testutil.TestTFJobName +
-				`-worker-0.ns1.svc.tf.training.com:2222"]},"task":{"type":"worker","index":0},"environment":"cloud"}`,
+				`-worker-0.ns1.svc.tf.training.com:2222"]},"task":{"type":"worker","index":0},"rpclayer":"grpc","environment":"cloud"}`,
 		},
 		tc{
 			tfJob:               testutil.NewTFJobWithNamespace(1, 1, "ns2"),
 			rt:                  "worker",
 			index:               "0",
 			customClusterDomain: "tf.training.org",
+			rpcLayer:            "grpc",
 			expectedClusterSpec: `{"cluster":{"ps":["` + testutil.TestTFJobName +
 				`-ps-0.ns2.svc.tf.training.org:2222"],"worker":["` + testutil.TestTFJobName +
-				`-worker-0.ns2.svc.tf.training.org:2222"]},"task":{"type":"worker","index":0},"environment":"cloud"}`,
+				`-worker-0.ns2.svc.tf.training.org:2222"]},"task":{"type":"worker","index":0},"rpclayer":"grpc","environment":"cloud"}`,
 		},
 		tc{
 			tfJob:               testutil.NewTFJobWithEvaluatorAndNamespace(1, 1, 1, "ns3"),
 			rt:                  "worker",
 			index:               "0",
 			customClusterDomain: "tf.training.io",
+			rpcLayer:            "grpc",
 			expectedClusterSpec: `{"cluster":{"ps":["` + testutil.TestTFJobName +
 				`-ps-0.ns3.svc.tf.training.io:2222"],"worker":["` + testutil.TestTFJobName +
-				`-worker-0.ns3.svc.tf.training.io:2222"]},"task":{"type":"worker","index":0},"environment":"cloud"}`,
+				`-worker-0.ns3.svc.tf.training.io:2222"]},"task":{"type":"worker","index":0},"rpclayer":"grpc","environment":"cloud"}`,
+		},
+		tc{
+			tfJob:               testutil.NewTFJobWithEvaluatorAndNamespace(1, 1, 1, "ns3"),
+			rt:                  "worker",
+			index:               "0",
+			customClusterDomain: "tf.training.io",
+			rpcLayer:            "gdr",
+			expectedClusterSpec: `{"cluster":{"ps":["` + testutil.TestTFJobName +
+				`-ps-0.ns3.svc.tf.training.io:2222"],"worker":["` + testutil.TestTFJobName +
+				`-worker-0.ns3.svc.tf.training.io:2222"]},"task":{"type":"worker","index":0},"rpclayer":"gdr","environment":"cloud"}`,
 		},
 	}
 	for _, c := range testCase {
 		os.Setenv(EnvCustomClusterDomain, c.customClusterDomain)
 		demoTemplateSpec := c.tfJob.Spec.TFReplicaSpecs[tfv1alpha2.TFReplicaTypeWorker].Template
+		demoTemplateSpec.Spec.Containers[0].Env = append(demoTemplateSpec.Spec.Containers[0].Env, v1.EnvVar{
+			Name:  rpcLayer,
+			Value: c.rpcLayer,
+		})
 		if err := setClusterSpec(&demoTemplateSpec, c.tfJob, c.rt, c.index); err != nil {
 			t.Errorf("Failed to set cluster spec: %v", err)
 		}
-		actual := demoTemplateSpec.Spec.Containers[0].Env[0].Value
+		actual := demoTemplateSpec.Spec.Containers[0].Env[1].Value
 		if c.expectedClusterSpec != actual {
 			t.Errorf("Expected %s, got %s", c.expectedClusterSpec, actual)
 		}
@@ -154,7 +173,7 @@ func TestRestartPolicy(t *testing.T) {
 			specRestartPolicy := tfv1alpha2.RestartPolicyExitCode
 			tfJob.Spec.TFReplicaSpecs[tfv1alpha2.TFReplicaTypeWorker].RestartPolicy = specRestartPolicy
 			return tc{
-				tfJob: tfJob,
+				tfJob:                 tfJob,
 				expectedRestartPolicy: v1.RestartPolicyNever,
 				expectedType:          tfv1alpha2.TFReplicaTypeWorker,
 			}
@@ -164,7 +183,7 @@ func TestRestartPolicy(t *testing.T) {
 			specRestartPolicy := tfv1alpha2.RestartPolicyNever
 			tfJob.Spec.TFReplicaSpecs[tfv1alpha2.TFReplicaTypeWorker].RestartPolicy = specRestartPolicy
 			return tc{
-				tfJob: tfJob,
+				tfJob:                 tfJob,
 				expectedRestartPolicy: v1.RestartPolicyNever,
 				expectedType:          tfv1alpha2.TFReplicaTypeWorker,
 			}
@@ -174,7 +193,7 @@ func TestRestartPolicy(t *testing.T) {
 			specRestartPolicy := tfv1alpha2.RestartPolicyAlways
 			tfJob.Spec.TFReplicaSpecs[tfv1alpha2.TFReplicaTypeWorker].RestartPolicy = specRestartPolicy
 			return tc{
-				tfJob: tfJob,
+				tfJob:                 tfJob,
 				expectedRestartPolicy: v1.RestartPolicyAlways,
 				expectedType:          tfv1alpha2.TFReplicaTypeWorker,
 			}
@@ -184,7 +203,7 @@ func TestRestartPolicy(t *testing.T) {
 			specRestartPolicy := tfv1alpha2.RestartPolicyOnFailure
 			tfJob.Spec.TFReplicaSpecs[tfv1alpha2.TFReplicaTypeWorker].RestartPolicy = specRestartPolicy
 			return tc{
-				tfJob: tfJob,
+				tfJob:                 tfJob,
 				expectedRestartPolicy: v1.RestartPolicyOnFailure,
 				expectedType:          tfv1alpha2.TFReplicaTypeWorker,
 			}

@@ -40,8 +40,10 @@ const (
 type TFConfig struct {
 	// Cluster represents a TensorFlow ClusterSpec.
 	// See: https://www.tensorflow.org/api_docs/python/tf/train/ClusterSpec
-	Cluster ClusterSpec `json:"cluster"`
-	Task    TaskSpec    `json:"task"`
+	Cluster  ClusterSpec `json:"cluster"`
+	Task     TaskSpec    `json:"task"`
+	RpcLayer string      `json:"rpclayer"`
+
 	// Environment is used by tensorflow.contrib.learn.python.learn in versions <= 1.3
 	// TODO(jlewi): I don't think it is used in versions TF >- 1.4. So we can eventually get rid of it.
 	Environment string `json:"environment"`
@@ -70,7 +72,7 @@ type TaskSpec struct {
 //         },
 //     }
 // }
-func genTFConfigJSONStr(tfjob *tfv1alpha2.TFJob, rtype, index string) (string, error) {
+func genTFConfigJSONStr(tfjob *tfv1alpha2.TFJob, rtype, index, rpcLayer string) (string, error) {
 	// Configure the TFCONFIG environment variable.
 	i, err := strconv.ParseInt(index, 0, 32)
 	if err != nil {
@@ -88,6 +90,7 @@ func genTFConfigJSONStr(tfjob *tfv1alpha2.TFJob, rtype, index string) (string, e
 			Type:  rtype,
 			Index: int(i),
 		},
+		RpcLayer: rpcLayer,
 		// We need to set environment to cloud  otherwise it will default to local which isn't what we want.
 		// Environment is used by tensorflow.contrib.learn.python.learn in versions <= 1.3
 		// TODO(jlewi): I don't think it is used in versions TF >- 1.4. So we can eventually get rid of it.
